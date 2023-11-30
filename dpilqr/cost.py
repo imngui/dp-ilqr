@@ -3,6 +3,7 @@
 """Implements various cost structures in the LQ Game"""
 
 import abc
+import itertools
 
 import numpy as np
 from scipy.optimize import approx_fprime
@@ -372,6 +373,7 @@ class GammaCost(Cost):
 
     def __call__(self, x):
         # TODO: Need dij and dijk, can we modify compute_pairwise... to also compute the dijk?
+        dijks = compute_pairwise_obstacle_distance(x, self.obstacles, self.x_dims)
         gamma_ij = self.gamma_a_cost(x)
         if self.obstacles:
             for o_k in self.obstacles:
@@ -383,6 +385,9 @@ class GammaCost(Cost):
         pass
 class PDLCost(Cost):
     def __init__(self, x_dims, n_dims, obstacles):
+        self.x_dims = x_dims
+        self.n_dims = n_dims
+        self.n_agents = len(x_dims)
         self.obstacles = obstacles
         self.alpha_cost = AlphaCost(x_dims, n_dims)
         self.beta_cost = BetaCost(x_dims, n_dims)
@@ -606,6 +611,31 @@ class GameCost(Cost):
 
 def compute_dijk(x_i, x_j, o_k):
     return np.linalg.norm(np.cross((o_k - x_j),(o_k - x_i))) / np.linalg.norm((x_j-x_i))
+
+def compute_pairwise_obstacle_distance(X, O, x_dims, n_d=2):
+    # assert len(set(x_dims)) == 1
+    if not O:
+        return np.array([])
+    n_agents = len(x_dims)
+    n_states = x_dims[0]
+
+    if n_agents == 1:
+        raise ValueError("Can't compute pairwise obstacle distance for one agent")
+
+    pair_inds = np.array(list(itertools.combinations(range(n_agents), 2)))
+    # O = np.array([[1.0, 1.0], [2, 2]])
+    dijks = np.zeros((len(O), pair_inds.shape[0]))
+    idx_o = 0
+    idx_ij = 0
+    # O = np.array([[1.0, 1.0]])
+    for o in O:
+        for (i, j) in pair_inds:
+            dijks[idx_o, idx_ij] = compute_dijk(X[i*n_states:i*n_states+n_d], X[j*n_states:j*n_states+n_d], o)
+            idx_ij += 1
+        idx_ij = 0
+        idx_o += 1
+    print('dijks: ', dijks)
+    return dijks
 
 def quadraticize_distance(point_a, point_b, radius, n_d):
     """Quadraticize the distance between two points thresholded by a radius

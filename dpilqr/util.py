@@ -56,7 +56,10 @@ def compute_pairwise_distance(X, x_dims, n_d=2):
         raise ValueError("Can't compute pairwise distance for one agent.")
 
     pair_inds = np.array(list(itertools.combinations(range(n_agents), 2)))
+    print(pair_inds)
+    print(X.shape[0])
     X_agent = X.reshape(-1, n_agents, n_states).swapaxes(0, 2)
+    print(X_agent)
     dX = X_agent[:n_d, pair_inds[:, 0]] - X_agent[:n_d, pair_inds[:, 1]]
     return np.linalg.norm(dX, axis=0).T
 
