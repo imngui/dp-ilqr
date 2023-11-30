@@ -20,7 +20,7 @@ from time import strftime
 
 import numpy as np
 
-from dpilqr.cost import GameCost, ProximityCost, ReferenceCost
+from dpilqr.cost import GameCost, ProximityCost, ReferenceCost, ConnectivityMaintenanceGameCost
 from dpilqr.dynamics import (
     DoubleIntDynamics4D,
     UnicycleDynamics4D,
@@ -42,16 +42,23 @@ def multi_agent_run(model, x_dims, dt, N, radius, energy=10.0, n_d=2, **kwargs):
     n_states = x_dims[0]
     STEP_SIZE = 3
 
-    x0, xf = random_setup(
-        n_agents,
-        n_states,
-        is_rotation=False,
-        rel_dist=n_agents,
-        var=n_agents / 2,
-        n_d=n_d,
-        random=True,
-        energy=energy,
-    )
+    # x0, xf = random_setup(
+    #     n_agents,
+    #     n_states,
+    #     is_rotation=False,
+    #     rel_dist=n_agents,
+    #     var=n_agents / 2,
+    #     n_d=n_d,
+    #     random=True,
+    #     energy=energy,
+    # )
+
+    x0 = np.array([[0.5, 1.5, 0, 0,
+                    2.5, 1.5, 0, 0,
+                    1.5, 1.3, 0, 0]]).T
+    xf = np.array([[2.5, 1.5, 0, 0,
+                    0.5, 1.5, 0, 0,
+                    1.5, 2.2, 0, 0]]).T
 
     x_dims = [n_states] * n_agents
     n_dims = [n_d] * n_agents
@@ -72,8 +79,10 @@ def multi_agent_run(model, x_dims, dt, N, radius, energy=10.0, n_d=2, **kwargs):
         ReferenceCost(xf_i, Q.copy(), R.copy(), Qf.copy(), id_)
         for xf_i, id_ in zip(split_agents_gen(xf, x_dims), ids)
     ]
-    prox_cost = ProximityCost(x_dims, radius, n_dims)
-    game_cost = GameCost(goal_costs, prox_cost)
+    obstacles = []
+    game_cost = ConnectivityMaintenanceGameCost(x_dims, n_dims, goal_costs, obstacles)
+    # prox_cost = ProximityCost(x_dims, radius, n_dims)
+    # game_cost = GameCost(goal_costs, prox_cost)
 
     problem = ilqrProblem(dynamics, game_cost)
 
@@ -87,24 +96,25 @@ def multi_agent_run(model, x_dims, dt, N, radius, energy=10.0, n_d=2, **kwargs):
         centralized=True,
         n_d=n_d,
         step_size=STEP_SIZE,
+        use_L=True,
         **kwargs,
     )
 
     # Solve the problem distributed.
-    print("\t\t\tdistributed")
-    # pool = mp.Pool()
-    pool = None
-    Xd, Ud, Jd = solve_rhc(
-        problem,
-        x0,
-        N,
-        radius,
-        centralized=False,
-        n_d=n_d,
-        step_size=STEP_SIZE,
-        pool=None,
-        **kwargs,
-    )
+    # print("\t\t\tdistributed")
+    # # pool = mp.Pool()
+    # pool = None
+    # Xd, Ud, Jd = solve_rhc(
+    #     problem,
+    #     x0,
+    #     N,
+    #     radius,
+    #     centralized=False,
+    #     n_d=n_d,
+    #     step_size=STEP_SIZE,
+    #     pool=None,
+    #     **kwargs,
+    # )
 
 
 def setup_logger(limit_solve_time):

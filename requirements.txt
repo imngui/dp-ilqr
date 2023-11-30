@@ -38,3 +38,4 @@ six==1.16.0
     # via python-dateutil
 sympy==1.11.1
     # via dpilqr (pyproject.toml)
+networkx

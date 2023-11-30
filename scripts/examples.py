@@ -336,9 +336,9 @@ def main():
     # single_unicycle()
     # single_quad6d()
     # two_quads_one_human()
-    # random_multiagent_simulation()
+    random_multiagent_simulation()
     # _3d_integrators()
-    nquads_mhumans()
+    # nquads_mhumans()
 
 if __name__ == "__main__":
     main()

@@ -11,6 +11,8 @@ from time import perf_counter
 
 import numpy as np
 
+from dpilqr.cost import PDLCost
+
 
 class ilqrSolver:
     """Iterative Linear Quadratic Gaussian solver
@@ -50,10 +52,12 @@ class ilqrSolver:
     MU_MAX = 1e3
     N_LS_ITER = 10
 
-    def __init__(self, problem, N=10):
+    def __init__(self, problem, N=10, use_L=False, obstacles=None):
 
         self.problem = problem
         self.N = N
+        self.use_L = use_L
+        self.obstacles = obstacles
 
         self._reset_regularization()
 
@@ -86,14 +90,27 @@ class ilqrSolver:
         J = 0.0
 
         for t in range(N):
+            # print('Xt: ', X[t])
             X[t + 1] = self.dynamics(X[t], U[t])
-            J += self.cost(X[t], U[t]).item()
-        J += self.cost(X[-1], np.zeros(self.n_u), terminal=True).item()
+
+            if self.use_L:
+                L = self.compute_L(X[t])
+                # print('Ct: ', self.cost(X[t], U[t], L=L))
+                J += self.cost(X[t], U[t], L=L).item()
+            else:
+                J += self.cost(X[t], U[t]).item()
+
+        if self.use_L:
+            L = self.compute_L(X[-1])
+            J += self.cost(X[-1], np.zeros(self.n_u), terminal=True, L=L).item()
+        else:
+            J += self.cost(X[-1], np.zeros(self.n_u), terminal=True).item()
 
         return X, J
 
     def _forward_pass(self, X, U, K, d, α):
         """Forward pass to rollout the control gains K and d."""
+        # print("n_x: ", self.n_x)
 
         X_next = np.zeros((self.N + 1, self.n_x))
         U_next = np.zeros((self.N, self.n_u))
@@ -108,7 +125,14 @@ class ilqrSolver:
             U_next[t] = U[t] + δu
             X_next[t + 1] = self.dynamics(X_next[t], U_next[t])
 
-            J += self.cost(X_next[t], U_next[t]).item()
+            if self.use_L:
+                L = self.compute_L(X_next[t])
+                J += self.cost(X_next[t], U_next[t], L=L).item()
+            else:
+                J += self.cost(X_next[t], U_next[t]).item()
+        if self.use_L:
+            L = self.compute_L(X_next[-1])
+            J += self.cost(X_next[-1], np.zeros((self.n_u)), terminal=True, L=L).item()
         J += self.cost(X_next[-1], np.zeros((self.n_u)), terminal=True).item()
 
         return X_next, U_next, J
@@ -122,14 +146,30 @@ class ilqrSolver:
         # self.μ = 0.0 # DBG
         reg = self.μ * np.eye(self.n_x)
 
-        L_x, _, L_xx, _, _ = self.cost.quadraticize(
-            X[-1], np.zeros(self.n_u), terminal=True
-        )
+        L_x = None
+        L_xx = None
+        if self.use_L:
+            L = self.compute_L(X[-1])
+            L_x, _, L_xx, _, _ = self.cost.quadraticize(
+                X[-1], np.zeros(self.n_u), terminal=True, L=L
+            )
+        else:
+            L_x, _, L_xx, _, _ = self.cost.quadraticize(
+                X[-1], np.zeros(self.n_u), terminal=True
+            )
         p = L_x
         P = L_xx
 
         for t in range(self.N - 1, -1, -1):
-            L_x, L_u, L_xx, L_uu, L_ux = self.cost.quadraticize(X[t], U[t])
+            L_u = None
+            L_uu = None
+            L_ux = None
+
+            if self.use_L:
+                L = self.compute_L(X[t])
+                L_x, L_u, L_xx, L_uu, L_ux = self.cost.quadraticize(X[t], U[t], L=L)
+            else:
+                L_x, L_u, L_xx, L_uu, L_ux = self.cost.quadraticize(X[t], U[t])
             A, B = self.dynamics.linearize(X[t], U[t])
 
             Q_x = L_x + A.T @ p
@@ -223,6 +263,30 @@ class ilqrSolver:
                 )
 
         return X, U, J
+
+    def compute_L(self, x):
+        # TODO
+        # X: Composite state of the system as 1x(N*n_agents) matrix
+        n_agents = len(self.cost.ref_costs)
+        x_dim = int(self.n_x / n_agents)
+        aij_cost = PDLCost([x_dim]*n_agents, [2]*n_agents, self.obstacles)
+        aij = aij_cost(x.copy(), self.obstacles, compute_L=True)[0]
+        A = np.zeros((n_agents, n_agents))
+        d = np.zeros(A.shape)
+        j = 0
+        for i in range(0, n_agents):
+            if len(A[i, i+1:] > 0):
+                a = aij[j:j+len(A[i, i+1:])]
+                A[i, i+1:] = a
+                j += len(A[i, i+1:])
+
+        A += A.T
+        for i in range(0, n_agents):
+            d[i, i] = sum(A[i, :])
+        print("A: ", A)
+        print("d: ", d)
+        print("L: ", (d - A).shape)
+        return d - A
 
     def _reset_regularization(self):
         """Reset regularization terms to their factory defaults."""

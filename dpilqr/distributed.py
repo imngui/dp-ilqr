@@ -56,7 +56,7 @@ def solve_distributed(problem, X, U, radius, ignore_ids=None, pool=None, verbose
         for i, (subproblem, x0i, Ui, id_) in enumerate(
             zip(problem.split(graph), x0_split, U_split, ids)
         ):
-            if id_ in ignore_ids:
+            if ignore_ids and id_ in ignore_ids:
                 if verbose:
                     solve_info[id_] = (0.0, [id_])
                     print(f"Ignoring subproblem {id_}...")
@@ -116,6 +116,7 @@ def solve_rhc(
     t_diverge=None,
     i_trial=None,
     verbose=False,
+    use_L=False,
     **kwargs,
 ):
     """Solve the problem in a receding horizon fashion either centralized or
@@ -151,7 +152,7 @@ def solve_rhc(
     # U = np.zeros((N, n_u))
     U = np.random.rand(N, n_u) * 0.01
     # U = np.tile([g, 0, 0], (N, n_agents))
-    centralized_solver = ilqrSolver(problem, N)
+    centralized_solver = ilqrSolver(problem, N, use_L)
 
     t = 0
     J = np.inf
