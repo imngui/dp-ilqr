@@ -5,9 +5,11 @@ from itertools import cycle
 from operator import mul
 
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 from matplotlib.animation import FuncAnimation
 import numpy as np
 
+from dpilqr.cost import GammaCost
 from dpilqr.util import split_agents, compute_pairwise_distance
 
 
@@ -90,7 +92,7 @@ def plot_interaction_graph(graph):
     plt.draw()
 
 
-def plot_solve(X, J, x_goal, x_dims=None, color_agents=False, n_d=2, ax=None):
+def plot_solve(X, J, x_goal, x_dims=None, color_agents=False, n_d=2, ax=None, obstacles=None):
     """Plot the resultant trajectory on plt.gcf()"""
 
     if n_d not in (2, 3):
@@ -105,6 +107,7 @@ def plot_solve(X, J, x_goal, x_dims=None, color_agents=False, n_d=2, ax=None):
         else:
             ax = plt.gcf().add_subplot(projection="3d")
 
+    ax.set_aspect('equal', adjustable='box')
     N = X.shape[0]
     n = np.arange(N)
     cm = plt.cm.Set2
@@ -137,7 +140,10 @@ def plot_solve(X, J, x_goal, x_dims=None, color_agents=False, n_d=2, ax=None):
                 Xi[-1, 0], Xi[-1, 1], Xi[-1,2], 
                 s=50, color=c, marker="o", edgecolors="k")
             
-
+    if obstacles:
+        for obstacle in obstacles:
+            circ = patches.Circle((obstacle[0], obstacle[1]), 0.4)
+            ax.add_patch(circ)
     plt.margins(0.1)
     plt.title(f"Final Cost: {J:.3g}")
     plt.draw()
@@ -152,6 +158,24 @@ def plot_pairwise_distances(X, x_dims, n_dims, radius):
     ax.set_title("Inter-Agent Distances")
     ax.set_xlabel("Time Steps")
     ax.set_ylabel("Pairwise Distance (m)")
+    ax.legend()
+    plt.draw()
+
+
+def plot_pairwise_gamma(X, x_dims, n_dims, obstacles):
+    _, ax = plt.subplots()
+    gamma_cost = GammaCost(x_dims, n_dims, obstacles)
+    gc = []
+    for i in range(len(X)):
+        print(gamma_cost(X[i,:], compute_L=True)[0])
+        gc.append(gamma_cost(X[i,:], compute_L=True)[0])
+    # gc = [gamma_cost(X[i,:][0], compute_L=True) for i in range(len(X))]
+    print(gc)
+    ax.plot(gc)
+    ax.hlines(0, *plt.xlim(), "r", ls="--", label="$\gamma_{ij}$")
+    ax.set_title("Gamma costs")
+    ax.set_xlabel("Time Steps")
+    ax.set_ylabel("Pairwise gamma")
     ax.legend()
     plt.draw()
 
@@ -217,7 +241,7 @@ def _animate(t, handles1, handles2, X, x_dims, distances):
     )
 
 
-def make_trajectory_gif(gifname, X, xf, x_dims, radius):
+def make_trajectory_gif(gifname, X, xf, x_dims, radius, obstacles):
     """Create a GIF of the evolving trajectory"""
 
     _, axes = plt.subplots(1, 2, figsize=(10, 6))
@@ -226,6 +250,11 @@ def make_trajectory_gif(gifname, X, xf, x_dims, radius):
     distances = compute_pairwise_distance(X, x_dims)
 
     handles = _setup_gif(axes, X, xf.flatten(), x_dims, radius, distances)
+
+    if obstacles:
+        for obstacle in obstacles:
+            circ = patches.Circle((obstacle[0], obstacle[1]), 0.4)
+            axes[0].add_patch(circ)
     anim = FuncAnimation(
         plt.gcf(),
         _animate,
@@ -236,7 +265,7 @@ def make_trajectory_gif(gifname, X, xf, x_dims, radius):
     anim.save(gifname, fps=N // 10, dpi=100)
 
 
-def eyeball_scenario(x0, xf, n_agents, n_states):
+def eyeball_scenario(x0, xf, n_agents, n_states, obstacles=None):
     """Render the scenario in 2D"""
     plt.clf()
 
@@ -248,5 +277,10 @@ def eyeball_scenario(x0, xf, n_agents, n_states):
         plt.annotate(
             "", Xi[1, :2], Xi[0, :2], arrowprops=dict(facecolor=plt.cm.tab20.colors[i])
         )
+
+    if obstacles:
+        for obstacle in obstacles:
+            circ = patches.Circle((obstacle[0], obstacle[1]), 0.4)
+            plt.gca().add_patch(circ)
     set_bounds(X.reshape(-1, n_states), zoom=0.2)
     plt.draw()

@@ -7,7 +7,7 @@ from time import perf_counter as pc
 import numpy as np
 
 from .control import ilqrSolver
-from .cost import ReferenceCost, GameCost, ConnectivityMaintenanceGameCost
+from .cost import ReferenceCost, GameCost, GameCost2, ConnectivityMaintenanceGameCost, ConnectivityMaintenanceGameCost2
 from .dynamics import DynamicalModel, MultiDynamicalModel
 from .util import split_agents_gen
 
@@ -22,7 +22,11 @@ class ilqrProblem:
 
         if isinstance(cost, GameCost):
             self.n_agents = len(cost.ref_costs)
+        if isinstance(cost, GameCost2):
+            self.n_agents = len(cost.ref_costs)
         if isinstance(cost, ConnectivityMaintenanceGameCost):
+            self.n_agents = len(cost.ref_costs)
+        if isinstance(cost, ConnectivityMaintenanceGameCost2):
             self.n_agents = len(cost.ref_costs)
 
     @property

@@ -96,6 +96,7 @@ def multi_agent_run(model, x_dims, dt, N, radius, energy=10.0, n_d=2, **kwargs):
         centralized=True,
         n_d=n_d,
         step_size=STEP_SIZE,
+        # verbose=True,
         use_L=True,
         **kwargs,
     )

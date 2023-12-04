@@ -115,7 +115,7 @@ def solve_rhc(
     dist_converge=None,
     t_diverge=None,
     i_trial=None,
-    verbose=False,
+    verbose=True,
     use_L=False,
     **kwargs,
 ):
@@ -168,7 +168,7 @@ def solve_rhc(
 
         if centralized:
             X, U, J, solve_info = solve_centralized(
-                centralized_solver, xi, U, ids, False, **kwargs
+                centralized_solver, xi, U, ids, True, **kwargs
             )
             # print(f"Shape of X at each prediction horizon is{X.shape}")
         else:
